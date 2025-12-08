@@ -66,6 +66,12 @@ void loop()
 {
   unsigned long now = millis();
 
+  // Wenn millis von vorne beginnt, muss letzter Test reseted werden
+  if (now < lastSampleTs)
+  {
+    lastSampleTs = now;
+  }
+
   // 1) Messen im Intervall
   if (now - lastSampleTs >= SAMPLE_INTERVAL_MS)
   {
