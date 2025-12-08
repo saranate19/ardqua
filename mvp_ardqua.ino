@@ -53,6 +53,28 @@ int getWaterProfile()
     return 3; // trocken
 }
 
+void runPump(const unsigned long runTime, const int threshold)
+{
+  Serial.println(F("*** Pumpvorgang START ***"));
+
+  while(True)
+  {
+    digitalWrite(PIN_PUMP, HIGH);
+    delay(runTime);
+    digitalWrite(PIN_PUMP, LOW);
+
+    delay(15000);
+
+    int moisture = readSoilAveraged();
+    if (moisture < (threshold + HYSTERESIS))
+    {
+      break;
+    }
+  }
+
+  Serial.println(F("*** Pumpvorgang STOP ***"));
+}
+
 void setup()
 {
   pinMode(PIN_PUMP, OUTPUT);
@@ -114,20 +136,9 @@ void loop()
     Serial.println(pumpTime);
 
     // 2) Startet die Pumpe?
-    if (!pumpRunning && moisture >= (threshold + HYSTERESIS))
+    if (moisture >= (threshold + HYSTERESIS))
     {
-      pumpRunning = true;
-      pumpStartTs = now;
-      digitalWrite(PIN_PUMP, HIGH);
-      Serial.println(F("Pumpe START"));
+      runPump(pumpTime, threshold);
     }
-  }
-
-  // 3) Pumpenlaufzeit nicht-blockierend verwalten
-  if (pumpRunning && (now - pumpStartTs >= PUMP_WET_MS))
-  {
-    pumpRunning = false;
-    digitalWrite(PIN_PUMP, LOW);
-    Serial.println(F("Pumpe STOP"));
   }
 }
