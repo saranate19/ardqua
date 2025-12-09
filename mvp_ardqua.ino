@@ -10,21 +10,19 @@ const int THRESH_NORMAL = 520; // normal
 const int THRESH_DRY = 610;    // trockenheitsliebend
 
 // --- Pumpenlaufzeiten je Profil ---
-const unsigned long PUMP_WET_MS = 2000;    // 2s
-const unsigned long PUMP_NORMAL_MS = 3000; // 3s
-const unsigned long PUMP_DRY_MS = 4000;    // 4s
+const unsigned long PUMP_WET_MS = 1000;    // 1s
+const unsigned long PUMP_NORMAL_MS = 2000; // 2s
+const unsigned long PUMP_DRY_MS = 3000;    // 3s
 
 // TODO: aktuell kurze Intervalle zum Testen
-const unsigned long SAMPLE_INTERVAL_MS = 15UL * 1000UL; // 15 Sekunden
-const unsigned long DEFAULT_PUMP_TIME = 3000UL;         // nur Fallback
+const unsigned long SAMPLE_INTERVAL_MS = 30000; // 30 Sekunden
+const unsigned long DEFAULT_PUMP_TIME = 1000; // nur Fallback
 
 // Optional: Hysterese
 const int HYSTERESIS = 20;
 
 // --- Zustandsvariablen ---
 unsigned long lastSampleTs = 0;
-unsigned long pumpStartTs = 0;
-bool pumpRunning = false;
 
 // Für geglättete Messung
 const int N_SAMPLES = 10;
@@ -57,7 +55,7 @@ void runPump(const unsigned long runTime, const int threshold)
 {
   Serial.println(F("*** Pumpvorgang START ***"));
 
-  while(True)
+  while (True)
   {
     digitalWrite(PIN_PUMP, HIGH);
     delay(runTime);
@@ -132,8 +130,8 @@ void loop()
     Serial.print(moisture);
     Serial.print(F(" | Schwelle: "));
     Serial.print(threshold);
-    Serial.print(F(" | Pumpzeit: "));
-    Serial.println(pumpTime);
+    Serial.print(F(" | Modus: "));
+    Serial.println(profile);
 
     // 2) Startet die Pumpe?
     if (moisture >= (threshold + HYSTERESIS))
