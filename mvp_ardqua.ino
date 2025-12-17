@@ -1,10 +1,12 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include <Thread.h>
+#include <ThreadController.h>
 
 // ================= OLED =================
-#define SCREEN_WIDTH 128
-#define SCREEN_HEIGHT 64
+static constexpr int SCREEN_WIDTH = 128;
+static constexpr int SCREEN_HEIGHT = 64;
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
 // ================= PINS =================
@@ -12,6 +14,9 @@ const int PIN_SOIL   = A0;
 const int PIN_SWITCH = A1;
 const int PIN_PUMP   = 8;
 const int PIN_BUTTON = 7;
+const int LED_WET    = 1;
+const int LED_MED    = 2;
+const int LED_DRY    = 3;
 
 // ================= DISPLAY =================
 const unsigned long DISPLAY_ON_MS = 5000;
@@ -28,16 +33,22 @@ enum DisplayMode
 DisplayMode currentMode = MODE_GRAPH;
 
 // ================= PROFILE =================
-const int THRESH_WET    = 430;
-const int THRESH_NORMAL = 520;
-const int THRESH_DRY    = 610;
+// threshold of soil moisture measurement
+static constexpr int thr[3] = {430, // feuchter Grenzwert
+                               520, // Mittlerer Grenzwert
+                               610  // Trockener Grenzwert
+                              };
 
-const unsigned long PUMP_WET_MS    = 1000;
-const unsigned long PUMP_NORMAL_MS = 2000;
-const unsigned long PUMP_DRY_MS    = 3000;
+// pump run time in ms
+static constexpr int prt[3] = {3000, // Pumpdauer feuchter Modus
+                               2000, // Pumpdauer mittlerer Modus
+                               1000  // Pumpdauer trockener Modus
+                              };
+
+// pins for LED configuration
+static constexpr int led[3] = {LED_WET, LED_MED, LED_DRY};
 
 const unsigned long SAMPLE_INTERVAL_MS = 30000;
-const unsigned long DEFAULT_PUMP_TIME = 1000;
 
 const int HYSTERESIS = 20;
 
@@ -191,6 +202,124 @@ void drawTextScreen(int profile, int moisture, int threshold)
   display.display();
 }
 
+// =================================================
+// ================= KLASSEn =======================
+// =================================================
+
+class Ardqua
+{
+private:
+  // current mode (wet=0, medium=1, dry=2)
+  int currentMode;
+
+  // current pump run time in ms
+  int pumpTime;
+
+  // current led pin
+  int ledPin;
+
+  // current OLED modus
+  bool displayOn;
+
+  // time of last button press
+  int buttonLastPressed;
+
+  // 
+
+public:
+  // constructor
+  Ardqua(int start_mode)
+  {
+    this->currentMode = start_mode;
+    this->pumpTime = prt[start_mode];
+    this->ledPin = led[start_mode];
+    this->displayOn = true;
+    this->buttonLastPressed = millis();
+  }
+
+  void changeMode()
+  {
+    digitalWrite(this->ledPin, LOW);
+    if (this->pumpTime == 2)
+    {
+      this->pumpTime = 0;
+    }
+    else
+    {
+      this->pumpTime++;
+    }
+    Serial.println(F("Pump Modus: "));
+    Serial.println(this->currentMode);
+    this->ledPin = led[this->currentMode];
+    this->pumpTime = prt[this->currentMode];
+    digitalWrite(this->ledPin, HIGH);
+    delay(1000);
+  }
+
+  void runPump()
+  {
+    Serial.println(F("*** Pumpvorgang START ***"));
+
+    digitalWrite(PIN_PUMP, HIGH);
+    delay(this->pumpTime);
+    digitalWrite(PIN_PUMP, LOW);
+
+    Serial.println(F("*** Pumpvorgang STOP ***"));
+  }
+
+  void checkBut()
+  {
+    if (digitalRead(PIN_BUTTON) == HIGH &&
+        (millis() - self->buttonLastPressed) < 5000)
+    {
+      self.changeMode();
+    }
+    if (digitalRead(PIN_BUTTON) == HIGH)
+    {
+      self->buttonLastPressed = millis();
+      self.displayWake();
+    }
+    else if ((millis() - self->buttonLastPressed) > 5000 &&
+              digitalRead(PIN_BUTTON == LOW))
+    {
+      this.displaySleep();
+    }
+  }
+
+  void displayWake()
+  {
+    if (!this->displayOn)
+    {
+      display.ssd1306_command(SSD1306_DISPLAYON);
+      this->displayOn = true;
+    }
+  }
+
+  void displaySleep()
+  {
+    if (this->displayOn)
+    {
+      display.ssd1306_command(SSD1306_DISPLAYOFF);
+      this->displayOn = false;
+    }
+  }
+
+  int getCurrentMode()
+  {
+    return this->currentMode;
+  }
+};
+
+// ========== Objekte erstellen ===========
+
+Ardqua a = Ardqua(0);
+
+// ThreadController that will controll all threads
+ThreadController controll = ThreadController();
+
+// Button pruefen
+Thread* checkButton = new Thread();
+
 // ================= SETUP =================
 
 void setup()
@@ -212,6 +341,13 @@ void setup()
   display.clearDisplay();
   display.display();
   display.ssd1306_command(SSD1306_DISPLAYOFF);
+
+  // Configure myThread
+	checkButton->onRun(a.checkBut());
+	checkButton->setInterval(500);
+
+	// Adds both threads to the controller
+	controll.add(checkButton);
 }
 
 // ================= LOOP =================
@@ -219,6 +355,8 @@ void setup()
 void loop()
 {
   unsigned long now = millis();
+
+  controll.run();
 
   // ---------- Taster ----------
   static bool lastButtonState = HIGH;
