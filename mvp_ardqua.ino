@@ -112,7 +112,7 @@ public:
     delay(1000);
   }
 
-  void checkPump()
+  void checkPump(int moisture)
   {
     if (moisture >= (this->threshold + HYSTERESIS))
     {
@@ -142,7 +142,7 @@ public:
     }
   }
 
-  void checkSchalter()
+  void checkSchalt()
   {
     if (digitalRead(PIN_WET) == HIGH && this->currentMode != 0)
     {
@@ -154,7 +154,7 @@ public:
     }
     else if (this->currentMode != 1)
     {
-      this->changePumpMode(1)
+      this->changePumpMode(1);
     }
   }
 
@@ -199,7 +199,7 @@ public:
     return moisture;
   }
 
-  void updateScreen()
+  void updateScreen(int moisture)
   {
     if (this->oledMode == MODE_GRAPH)
     {
