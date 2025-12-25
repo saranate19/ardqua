@@ -21,7 +21,7 @@ const int PIN_WET = 4;
 const int PIN_DRY = 5;
 
 // ================= DISPLAY =================
-const unsigned long DISPLAY_ON_MS = 5000;
+const unsigned long DISPLAY_ON_MS = 10000;
 
 // ================= DISPLAY MODUS =================
 enum DisplayMode
@@ -151,25 +151,26 @@ public:
   void checkBut()
   {
     Serial.println(this->buttonLastPressed);
-    if (digitalRead(PIN_BUTTON) == HIGH)
-    {
-      Serial.println("Button HIGH");
-    }
+    Serial.println(this->displayOn);
     if (digitalRead(PIN_BUTTON) == HIGH &&
         (millis() - this->buttonLastPressed) < DISPLAY_ON_MS)
     {
+      Serial.println("TFT Display Modus aendern");
       this->changeDispMode();
+      this->updateScreen(moistureHistory[-1]);
       this->buttonLastPressed = millis();
     }
     else if (digitalRead(PIN_BUTTON) == HIGH
             && (millis() - this->buttonLastPressed) > DISPLAY_ON_MS)
     {
-      this->buttonLastPressed = millis();
       this->displayWake();
+      Serial.println("TFT Display Wake");
+      this->buttonLastPressed = millis();
     }
     else if ((millis() - this->buttonLastPressed) > DISPLAY_ON_MS &&
              digitalRead(PIN_BUTTON == LOW))
     {
+      Serial.println("TFT Display Sleep");
       this->displaySleep();
     }
   }
@@ -235,7 +236,6 @@ public:
       analogWrite(PIN_BL, 0);     // Backlight AUS
     }
   }
-
 
   void drawMoistureGraph()
   {
@@ -371,11 +371,13 @@ void setup()
   checkSchalter->setInterval(500);
 
   checkMoisture->onRun(CallbackMoisture);
-  checkMoisture->setInterval(10000); // Temporaer 10 Sekunden
+  checkMoisture->setInterval(SAMPLE_INTERVAL_MS);
 
   controll.add(checkButton);
   controll.add(checkSchalter);
   controll.add(checkMoisture);
+
+  a.displayWake();
 }
 
 // ================= LOOP =================
