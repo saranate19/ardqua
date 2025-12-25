@@ -8,17 +8,15 @@
 #define TFT_CS   10
 #define TFT_DC    9
 #define TFT_RST   8
+const int PIN_BL = 7;   // PWM-fähiger Pin für Backlight
 
 Adafruit_ST7735 display = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
 
 // ================= PINS =================
 const int PIN_SOIL = A0;
 const int PIN_SWITCH = A1;
-const int PIN_PUMP = 12;
-const int PIN_BUTTON = 7;
-const int LED_WET = 1;
-const int LED_MED = 2;
-const int LED_DRY = 3;
+const int PIN_PUMP = 2;
+const int PIN_BUTTON = 6;
 const int PIN_WET = 4;
 const int PIN_DRY = 5;
 
@@ -47,9 +45,6 @@ static constexpr int prt[3] = {
     1000  // Pumpdauer trockener Modus
 };
 
-// pins for LED configuration
-static constexpr int led[3] = {LED_WET, LED_MED, LED_DRY};
-
 const unsigned long SAMPLE_INTERVAL_MS = 30000;
 
 const int HYSTERESIS = 20;
@@ -77,14 +72,12 @@ private:
   int pumpTime;
   // current threshold of moisture measurement
   int threshold;
-  // current led pin
-  int ledPin;
-  // current OLED modus
+  // current tft modus
   bool displayOn;
   // time of last button press
-  int buttonLastPressed;
-  // Mode of the OLED Display
-  DisplayMode oledMode;
+  unsigned long buttonLastPressed;
+  // Mode of the TFT Display
+  DisplayMode tftMode;
 
 public:
   // constructor
@@ -92,25 +85,20 @@ public:
   {
     this->currentMode = start_mode;
     this->pumpTime = prt[start_mode];
-    this->ledPin = led[start_mode];
     this->threshold = thr[start_mode];
     this->displayOn = true;
-    this->oledMode = MODE_GRAPH;
+    this->tftMode = MODE_GRAPH;
     this->buttonLastPressed = millis();
   }
 
   void changePumpMode(int newmode)
   {
-    digitalWrite(this->ledPin, LOW);
-
     this->currentMode = newmode;
 
     Serial.println(F("Pump Modus: "));
     Serial.println(this->currentMode);
-    this->ledPin = led[this->currentMode];
     this->pumpTime = prt[this->currentMode];
     this->threshold = thr[this->currentMode];
-    digitalWrite(this->ledPin, HIGH);
     delay(1000);
   }
 
@@ -134,13 +122,13 @@ public:
 
   void changeDispMode()
   {
-    if (this->oledMode == MODE_GRAPH)
+    if (this->tftMode == MODE_GRAPH)
     {
-      this->oledMode = MODE_TEXT;
+      this->tftMode = MODE_TEXT;
     }
     else
     {
-      this->oledMode = MODE_GRAPH;
+      this->tftMode = MODE_GRAPH;
     }
   }
 
@@ -162,13 +150,19 @@ public:
 
   void checkBut()
   {
+    Serial.println(this->buttonLastPressed);
+    if (digitalRead(PIN_BUTTON) == HIGH)
+    {
+      Serial.println("Button HIGH");
+    }
     if (digitalRead(PIN_BUTTON) == HIGH &&
         (millis() - this->buttonLastPressed) < DISPLAY_ON_MS)
     {
       this->changeDispMode();
       this->buttonLastPressed = millis();
     }
-    if (digitalRead(PIN_BUTTON) == HIGH)
+    else if (digitalRead(PIN_BUTTON) == HIGH
+            && (millis() - this->buttonLastPressed) > DISPLAY_ON_MS)
     {
       this->buttonLastPressed = millis();
       this->displayWake();
@@ -203,7 +197,7 @@ public:
 
   void updateScreen(int moisture)
   {
-    if (this->oledMode == MODE_GRAPH)
+    if (this->tftMode == MODE_GRAPH)
     {
       this->drawMoistureGraph();
     }
@@ -223,68 +217,88 @@ public:
     }
   }
 
-void displayWake()
-{
-  this->displayOn = true;
-}
-
-void displaySleep()
-{
-  this->displayOn = false;
-  display.fillScreen(ST77XX_BLACK);
-}
+  void displayWake()
+  {
+    if (!this->displayOn)
+    {
+      this->displayOn = true;
+      analogWrite(PIN_BL, 200);   // Backlight EIN
+    }
   }
+
+  void displaySleep()
+  {
+    if (this->displayOn)
+    {
+      this->displayOn = false;
+      display.fillScreen(ST77XX_BLACK);
+      analogWrite(PIN_BL, 0);     // Backlight AUS
+    }
+  }
+
 
   void drawMoistureGraph()
   {
     if (!this->displayOn)
       return;
 
+    // Größere Fläche an TFT (128x160)
     const int gx = 0;
-    const int gy = 16;
+    const int gy = 20;
     const int gw = 128;
-    const int gh = 48;
+    const int gh = 128;
 
-    display.clearDisplay();
+    // Hintergrund schwarz
+    display.fillScreen(ST77XX_BLACK);
+
+    // Titel
     display.setTextSize(1);
     display.setCursor(0, 0);
+    display.setTextColor(ST77XX_WHITE);
     display.print(F("Feuchteverlauf"));
 
+    // Rahmen
     display.drawRect(gx, gy, gw, gh, ST77XX_WHITE);
 
+    // Graph Linie
     int count = historyFilled ? HISTORY_SIZE : historyIndex;
-    if (count < 2)
-      return;
+    if (count < 2) return;
 
     for (int i = 1; i < count; i++)
     {
-      int idx0 = (historyIndex + i - count - 1 + HISTORY_SIZE) % HISTORY_SIZE;
-      int idx1 = (historyIndex + i - count + HISTORY_SIZE) % HISTORY_SIZE;
+        int idx0 = (historyIndex + i - count - 1 + HISTORY_SIZE) % HISTORY_SIZE;
+        int idx1 = (historyIndex + i - count + HISTORY_SIZE) % HISTORY_SIZE;
 
-      int v0 = moistureHistory[idx0];
-      int v1 = moistureHistory[idx1];
+        int v0 = moistureHistory[idx0];
+        int v1 = moistureHistory[idx1];
 
-      int y0 = map(v0, 0, 1023, gy + gh - 2, gy + 1);
-      int y1 = map(v1, 0, 1023, gy + gh - 2, gy + 1);
+        int y0 = map(v0, 0, 1023, gy + gh - 2, gy + 2);
+        int y1 = map(v1, 0, 1023, gy + gh - 2, gy + 2);
 
-      int x0 = map(i - 1, 0, count - 1, gx + 1, gx + gw - 2);
-      int x1 = map(i, 0, count - 1, gx + 1, gx + gw - 2);
+        int x0 = map(i - 1, 0, count - 1, gx + 2, gx + gw - 2);
+        int x1 = map(i, 0, count - 1, gx + 2, gx + gw - 2);
 
-      display.drawLine(x0, y0, x1, y1, ST77XX_WHITE);
+        // grüne Linie für Feuchteverlauf
+        display.drawLine(x0, y0, x1, y1, ST77XX_GREEN);
     }
 
-    int yThresh = map(this->threshold, 0, 1023, gy + gh - 2, gy + 1);
-    display.drawLine(gx + 1, yThresh, gx + gw - 2, yThresh, ST77XX_WHITE);
+    // Schwellenlinie rot
+    int yThresh = map(this->threshold, 0, 1023, gy + gh - 2, gy + 2);
+    display.drawLine(gx + 2, yThresh, gx + gw - 2, yThresh, ST77XX_RED);
   }
 
   void drawTextScreen(int moisture)
   {
     if (!this->displayOn)
-      return;
+        return;
 
-    display.clearDisplay();
-    display.setTextSize(1);
-    display.setCursor(0, 0);
+    // Hintergrund schwarz
+    display.fillScreen(ST77XX_BLACK);
+
+    // Text Einstellungen
+    display.setTextSize(2);                 // etwas größer für TFT
+    display.setTextColor(ST77XX_WHITE);     // Textfarbe
+    display.setCursor(5, 10);
 
     display.print(F("Profil: "));
     display.println(this->currentMode);
@@ -295,6 +309,7 @@ void displaySleep()
     display.print(F("Schwelle: "));
     display.println(this->threshold);
   }
+
 };
 
 // ========== Objekte erstellen ===========
@@ -338,13 +353,15 @@ void setup()
   pinMode(PIN_PUMP, OUTPUT);
   digitalWrite(PIN_PUMP, LOW);
 
-  pinMode(PIN_BUTTON, INPUT_PULLUP);
+  pinMode(PIN_BUTTON, INPUT);
+
+  pinMode(PIN_BL, OUTPUT);
+  analogWrite(PIN_BL, 200);   // Backlight AN (0–255)
 
   Serial.begin(9600);
-  Serial.println(F("Start: Autobewaesserung mit OLED"));
+  Serial.println(F("Start: Autobewaesserung mit TFT"));
 
   display.initR(INITR_BLACKTAB);
-  display.setRotation(1);              // Querformat
   display.fillScreen(ST77XX_BLACK);
 
   checkButton->onRun(CallbackButton);
@@ -365,7 +382,5 @@ void setup()
 
 void loop()
 {
-  unsigned long now = millis();
-
   controll.run();
 }
