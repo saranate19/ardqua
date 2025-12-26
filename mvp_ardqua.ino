@@ -4,24 +4,23 @@
 #include <Thread.h>
 #include <ThreadController.h>
 
-// ================= TFT ==================
-#define TFT_CS   10
-#define TFT_DC    9
-#define TFT_RST   8
-const int PIN_BL = 7;   // PWM-fähiger Pin für Backlight
-
-Adafruit_ST7735 display = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
+// ============== TFT PINS ================
+const int TFT_CS  = 10;
+const int TFT_DC  = 9;
+const int TFT_RST = 8;
+const int PIN_BL  = 7;   // PWM-fähiger Pin für Backlight
 
 // ================= PINS =================
-const int PIN_SOIL = A0;
+const int PIN_SOIL   = A0;
 const int PIN_SWITCH = A1;
-const int PIN_PUMP = 2;
+const int PIN_PUMP   = 2;
+const int PIN_WET    = 4;
+const int PIN_DRY    = 5;
 const int PIN_BUTTON = 6;
-const int PIN_WET = 4;
-const int PIN_DRY = 5;
 
 // ================= DISPLAY =================
 const unsigned long DISPLAY_ON_MS = 10000;
+Adafruit_ST7735 display = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
 
 // ================= DISPLAY MODUS =================
 enum DisplayMode
@@ -43,6 +42,12 @@ static constexpr int prt[3] = {
     3000, // Pumpdauer feuchter Modus
     2000, // Pumpdauer mittlerer Modus
     1000  // Pumpdauer trockener Modus
+};
+
+static String str[3] = {
+    "Feucht", // Pumpdauer feuchter Modus
+    "Mittel", // Pumpdauer mittlerer Modus
+    "Trocken"  // Pumpdauer trockener Modus
 };
 
 const unsigned long SAMPLE_INTERVAL_MS = 30000;
@@ -68,6 +73,7 @@ class Ardqua
 private:
   // current mode (wet=0, medium=1, dry=2)
   int currentMode;
+  String modeStr;
   // current pump run time in ms
   int pumpTime;
   // current threshold of moisture measurement
@@ -84,6 +90,7 @@ public:
   Ardqua(int start_mode)
   {
     this->currentMode = start_mode;
+    this->modeStr = str[start_mode];
     this->pumpTime = prt[start_mode];
     this->threshold = thr[start_mode];
     this->displayOn = true;
@@ -94,12 +101,11 @@ public:
   void changePumpMode(int newmode)
   {
     this->currentMode = newmode;
-
-    Serial.println(F("Pump Modus: "));
-    Serial.println(this->currentMode);
+    this->modeStr = str[this->currentMode];
     this->pumpTime = prt[this->currentMode];
     this->threshold = thr[this->currentMode];
-    delay(1000);
+    Serial.println(F("Pump Modus: "));
+    Serial.println(this->modeStr);
   }
 
   void checkPump(int moisture)
@@ -152,25 +158,28 @@ public:
 
   void checkBut()
   {
-    if (digitalRead(PIN_BUTTON) == HIGH &&
-        (millis() - this->buttonLastPressed) < DISPLAY_ON_MS)
+    bool but_pressed = digitalRead(PIN_BUTTON) == HIGH;
+    if (but_pressed && (millis() - this->buttonLastPressed) < DISPLAY_ON_MS && this->displayOn)
     {
       Serial.println("TFT Display Modus aendern");
       this->changeDispMode();
       this->updateScreen(moistureHistory[historyIndex-1]);
       this->buttonLastPressed = millis();
     }
-    else if (digitalRead(PIN_BUTTON) == HIGH
-            && (millis() - this->buttonLastPressed) > DISPLAY_ON_MS)
+    else if (but_pressed && (millis() - this->buttonLastPressed) > DISPLAY_ON_MS && !this->displayOn)
     {
-      this->displayWake();
+      Serial.println("TFT Display aktiviert");
+      this->displayOn = true;
+      analogWrite(PIN_BL, 200);
       this->updateScreen(moistureHistory[-1]);
       this->buttonLastPressed = millis();
     }
-    else if ((millis() - this->buttonLastPressed) > DISPLAY_ON_MS &&
-             digitalRead(PIN_BUTTON == LOW))
+    else if ((millis() - this->buttonLastPressed) > DISPLAY_ON_MS && !but_pressed && this->displayOn)
     {
-      this->displaySleep();
+      Serial.println("TFT Display deaktiviert");
+      this->displayOn = false;
+      display.fillScreen(ST77XX_BLACK);
+      analogWrite(PIN_BL, 0);
     }
   }
 
@@ -186,7 +195,7 @@ public:
     moisture = sum / N_SAMPLES;
 
     Serial.print(F("Profil: "));
-    Serial.print(this->currentMode);
+    Serial.print(this->modeStr);
     Serial.print(F(" | Feuchte: "));
     Serial.print(moisture);
     Serial.print(F(" | Schwelle: "));
@@ -214,25 +223,6 @@ public:
     {
       historyIndex = 0;
       historyFilled = true;
-    }
-  }
-
-  void displayWake()
-  {
-    if (!this->displayOn)
-    {
-      this->displayOn = true;
-      analogWrite(PIN_BL, 200);   // Backlight EIN
-    }
-  }
-
-  void displaySleep()
-  {
-    if (this->displayOn)
-    {
-      this->displayOn = false;
-      display.fillScreen(ST77XX_BLACK);
-      analogWrite(PIN_BL, 0);     // Backlight AUS
     }
   }
 
@@ -300,7 +290,7 @@ public:
     display.setCursor(5, 10);
 
     display.print(F("Profil: "));
-    display.println(this->currentMode);
+    display.println(this->modeStr);
 
     display.print(F("Feuchte: "));
     display.println(moisture);
@@ -316,17 +306,19 @@ public:
 // Objekt a der Klasse Ardqua mit Modus "medium" instanzieren
 Ardqua a = Ardqua(1);
 
-// ThreadController that will controll all threads
+// ThreadController: kontrolliert alle Threads.
 ThreadController controll = ThreadController();
 
-// Button pruefen
+// Button pruefen und falls gedruckt Display aktivieren/steuern
 Thread *checkButton = new Thread();
-// Feuchtigkeitssensor auslesen
+// Feuchtigkeitssensor auslesen, Messwert speichern, allenfalls Pumpe starten
 Thread *checkMoisture = new Thread();
-// Schalter pruefen
+// Schalter pruefen, falls veraendert: Modus anpassen
 Thread *checkSchalter = new Thread();
 
-// Hack: Funktionen erstellen, weil onRun() nicht mit Methoden funktioniert?
+// =============== Funktionen ===============
+// Hack: Funktionen erstellen, weil onRun() nicht mit Methoden funktioniert (?)
+
 void CallbackButton()
 {
   a.checkBut();
@@ -365,6 +357,7 @@ void setup()
 
   display.initR(INITR_BLACKTAB);
   display.fillScreen(ST77XX_BLACK);
+  a.updateScreen(moistureHistory[0]);
 
   checkButton->onRun(CallbackButton);
   checkButton->setInterval(200);
@@ -378,8 +371,6 @@ void setup()
   controll.add(checkButton);
   controll.add(checkSchalter);
   controll.add(checkMoisture);
-
-  a.displayWake();
 }
 
 // ================= LOOP =================
