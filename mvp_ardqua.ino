@@ -64,6 +64,9 @@ bool historyFilled = false;
 unsigned long lastSampleTs = 0;
 const int N_SAMPLES = 10;
 
+bool pumpEnabled = false;
+
+
 // =================================================
 // ================= KLASSEN =======================
 // =================================================
@@ -110,6 +113,12 @@ public:
 
   void checkPump(int moisture)
   {
+    if (!pumpEnabled)
+    {
+      Serial.println(F("Pumpe gesperrt"));
+      return;
+    }
+
     if (moisture >= (this->threshold + HYSTERESIS))
     {
       Serial.println(F("*** Pumpvorgang START ***"));
@@ -158,7 +167,7 @@ public:
 
   void checkBut()
   {
-    bool but_pressed = digitalRead(PIN_BUTTON) == HIGH;
+    bool but_pressed = digitalRead(PIN_BUTTON) == LOW;
     if (but_pressed && (millis() - this->buttonLastPressed) < DISPLAY_ON_MS && this->displayOn)
     {
       Serial.println("TFT Display Modus aendern");
@@ -334,7 +343,10 @@ void CallbackMoisture()
   int moisture = a.readSoilAveraged();
   a.addMoistureToHistory(moisture);
   a.updateScreen(moisture);
+
+  pumpEnabled = true;
   a.checkPump(moisture);
+  pumpEnabled = false;
 }
 
 // ================= SETUP =================
@@ -343,8 +355,9 @@ void setup()
 {
   pinMode(PIN_PUMP, OUTPUT);
   digitalWrite(PIN_PUMP, LOW);
+  delay(500);
 
-  pinMode(PIN_BUTTON, INPUT);
+  pinMode(PIN_BUTTON, INPUT_PULLUP);
 
   pinMode(PIN_BL, OUTPUT);
   analogWrite(PIN_BL, 200);   // Backlight AN (0–255)
