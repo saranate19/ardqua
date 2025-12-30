@@ -114,9 +114,9 @@ public:
     {
       Serial.println(F("*** Pumpvorgang START ***"));
 
-      digitalWrite(PIN_PUMP, HIGH);
-      delay(this->pumpTime);
       digitalWrite(PIN_PUMP, LOW);
+      delay(this->pumpTime);
+      digitalWrite(PIN_PUMP, HIGH);
 
       Serial.println(F("*** Pumpvorgang STOP ***"));
     }
@@ -394,7 +394,7 @@ void CallbackMoisture()
 void setup()
 {
   pinMode(PIN_PUMP, OUTPUT);
-  digitalWrite(PIN_PUMP, LOW);
+  digitalWrite(PIN_PUMP, HIGH);
 
   pinMode(PIN_BUTTON, INPUT);
 
