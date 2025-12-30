@@ -218,63 +218,114 @@ public:
 
   void addMoistureToHistory(int value)
   {
-    moistureHistory[historyIndex++] = value;
-    if (historyIndex >= HISTORY_SIZE)
+    if (!historyFilled)
     {
-      historyIndex = 0;
-      historyFilled = true;
+      moistureHistory[historyIndex++] = value;
+
+      if (historyIndex >= HISTORY_SIZE)
+      {
+        historyIndex = HISTORY_SIZE;
+        historyFilled = true;
+      }
+      return;
     }
+
+    // Array nach links schieben (aeltester Wert faellt raus)
+    for (int i = 0; i < HISTORY_SIZE - 1; i++)
+    {
+      moistureHistory[i] = moistureHistory[i + 1];
+    }
+    moistureHistory[HISTORY_SIZE - 1] = value;
   }
 
   void drawMoistureGraph()
+{
+  if (!this->displayOn)
+    return;
+
+  const int gx = 20;
+  const int gy = 20;
+  const int gw = 100;
+  const int gh = 100;
+
+  display.fillScreen(ST77XX_BLACK);
+
+  display.setTextSize(1);
+  display.setCursor(0, 0);
+  display.setTextColor(ST77XX_WHITE);
+  display.print(F("Feuchteverlauf"));
+
+  display.drawRect(gx, gy, gw, gh, ST77XX_WHITE);
+
+  // ---------- Y-Achse ----------
+  display.setCursor(0, gy);
+  display.print(F("dry"));
+
+  display.setCursor(0, gy + gh - 8);
+  display.print(F("wet"));
+
+  // ---------- Graph ----------
+  int count = historyFilled ? HISTORY_SIZE : historyIndex;
+  if (count < 2) return;
+
+  for (int i = 1; i < count; i++)
   {
-    if (!this->displayOn)
-      return;
+    int idx0 = (historyIndex + i - count - 1 + HISTORY_SIZE) % HISTORY_SIZE;
+    int idx1 = (historyIndex + i - count + HISTORY_SIZE) % HISTORY_SIZE;
 
-    // Größere Fläche an TFT (128x160)
-    const int gx = 0;
-    const int gy = 20;
-    const int gw = 128;
-    const int gh = 128;
+    int v0 = moistureHistory[idx0];
+    int v1 = moistureHistory[idx1];
 
-    // Hintergrund schwarz
-    display.fillScreen(ST77XX_BLACK);
+    int y0 = map(v0, 0, 1023, gy + gh - 2, gy + 2);
+    int y1 = map(v1, 0, 1023, gy + gh - 2, gy + 2);
 
-    // Titel
-    display.setTextSize(1);
-    display.setCursor(0, 0);
-    display.setTextColor(ST77XX_WHITE);
-    display.print(F("Feuchteverlauf"));
+    int x0 = map(i - 1, 0, count - 1, gx + 2, gx + gw - 2);
+    int x1 = map(i, 0, count - 1, gx + 2, gx + gw - 2);
 
-    // Rahmen
-    display.drawRect(gx, gy, gw, gh, ST77XX_WHITE);
-
-    // Graph Linie
-    int count = historyFilled ? HISTORY_SIZE : historyIndex;
-    if (count < 2) return;
-
-    for (int i = 1; i < count; i++)
-    {
-        int idx0 = (historyIndex + i - count - 1 + HISTORY_SIZE) % HISTORY_SIZE;
-        int idx1 = (historyIndex + i - count + HISTORY_SIZE) % HISTORY_SIZE;
-
-        int v0 = moistureHistory[idx0];
-        int v1 = moistureHistory[idx1];
-
-        int y0 = map(v0, 0, 1023, gy + gh - 2, gy + 2);
-        int y1 = map(v1, 0, 1023, gy + gh - 2, gy + 2);
-
-        int x0 = map(i - 1, 0, count - 1, gx + 2, gx + gw - 2);
-        int x1 = map(i, 0, count - 1, gx + 2, gx + gw - 2);
-
-        // grüne Linie für Feuchteverlauf
-        display.drawLine(x0, y0, x1, y1, ST77XX_GREEN);
-    }
-
-    // Schwellenlinie rot
-    int yThresh = map(this->threshold, 0, 1023, gy + gh - 2, gy + 2);
-    display.drawLine(gx + 2, yThresh, gx + gw - 2, yThresh, ST77XX_RED);
+    display.drawLine(x0, y0, x1, y1, ST77XX_GREEN);
   }
+
+  // ---------- Schwelle ----------
+  int yThresh = map(this->threshold, 0, 1023, gy + gh - 2, gy + 2);
+  display.drawLine(gx + 2, yThresh, gx + gw - 2, yThresh, ST77XX_RED);
+
+  display.setTextColor(ST77XX_RED);
+  display.setCursor(0, yThresh-2);
+  display.print(this->threshold);
+
+  // ---------- X-Achse ----------
+  if ((historyIndex * SAMPLE_INTERVAL_MS / 60000) > 60)
+  {
+    float totalzeit = round(historyIndex * SAMPLE_INTERVAL_MS / 3600000 * 10) / 10;
+    float halbzeit = round(totalzeit*5) / 10;
+    display.setTextColor(ST77XX_WHITE);
+
+    display.setCursor(gx, gy + gh + 4);
+    display.print(totalzeit);
+    display.print(F("h"));
+
+    display.setCursor(gx + (gw/2) - 10, gy + gh + 4);
+    display.print(halbzeit);
+    display.print(F("h"));
+  }
+  else
+  {
+    long totalzeit = round(historyIndex * SAMPLE_INTERVAL_MS / 60000);
+    long halbzeit = round(totalzeit*5) / 10;
+    display.setTextColor(ST77XX_WHITE);
+
+    display.setCursor(gx, gy + gh + 4);
+    display.print(totalzeit);
+    display.print(F("min"));
+
+    display.setCursor(gx + (gw/2) -10, gy + gh + 4);
+    display.print(halbzeit);
+    display.print(F("min"));
+  }
+  display.setCursor(gx + gw - 18, gy + gh + 4);
+  display.print(F("now"));
+}
+
 
   void drawTextScreen(int moisture)
   {
@@ -287,7 +338,7 @@ public:
     // Text Einstellungen
     display.setTextSize(1);                 // etwas größer für TFT
     display.setTextColor(ST77XX_WHITE);     // Textfarbe
-    display.setCursor(5, 10);
+    display.setCursor(0, 10);
 
     display.print(F("Profil: "));
     display.println(this->modeStr);
@@ -297,6 +348,7 @@ public:
 
     display.print(F("Schwelle: "));
     display.println(this->threshold);
+
   }
 
 };
