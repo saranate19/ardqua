@@ -218,12 +218,24 @@ public:
 
   void addMoistureToHistory(int value)
   {
-    moistureHistory[historyIndex++] = value;
-    if (historyIndex >= HISTORY_SIZE)
+    if (!historyFilled)
     {
-      historyIndex = 0;
-      historyFilled = true;
+      moistureHistory[historyIndex++] = value;
+
+      if (historyIndex >= HISTORY_SIZE)
+      {
+        historyIndex = HISTORY_SIZE;
+        historyFilled = true;
+      }
+      return;
     }
+
+    // Array nach links schieben (aeltester Wert faellt raus)
+    for (int i = 0; i < HISTORY_SIZE - 1; i++)
+    {
+      moistureHistory[i] = moistureHistory[i + 1];
+    }
+    moistureHistory[HISTORY_SIZE - 1] = value;
   }
 
   void drawMoistureGraph()
