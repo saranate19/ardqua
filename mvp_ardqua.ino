@@ -5,18 +5,18 @@
 #include <ThreadController.h>
 
 // ============== TFT PINS ================
-const int TFT_CS  = 10;
+const int PIN_BL  = 7;
+const int TFT_CS  = 8;
 const int TFT_DC  = 9;
-const int TFT_RST = 8;
-const int PIN_BL  = 7;   // PWM-fähiger Pin für Backlight
+const int TFT_RST = 10;
 
 // ================= PINS =================
 const int PIN_SOIL   = A0;
-const int PIN_SWITCH = A1;
-const int PIN_PUMP   = 2;
-const int PIN_WET    = 4;
-const int PIN_DRY    = 5;
-const int PIN_BUTTON = 6;
+const int PIN_BUTTON = 2;
+const int PIN_PUMP   = 3;
+const int PIN_WET    = 5;
+const int PIN_DRY    = 6;
+
 
 // ================= DISPLAY =================
 const unsigned long DISPLAY_ON_MS = 10000;
