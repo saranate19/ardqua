@@ -32,9 +32,9 @@ enum DisplayMode
 // ================= PROFILE =================
 // threshold of soil moisture measurement
 static constexpr int thr[3] = {
-    430, // feuchter Grenzwert
-    520, // Mittlerer Grenzwert
-    610  // Trockener Grenzwert
+    400, // feuchter Grenzwert
+    450, // Mittlerer Grenzwert
+    500  // Trockener Grenzwert
 };
 
 // pump run time in ms
@@ -50,7 +50,7 @@ static String str[3] = {
     "Trocken"  // Pumpdauer trockener Modus
 };
 
-const unsigned long SAMPLE_INTERVAL_MS = 30000;
+const unsigned long SAMPLE_INTERVAL_MS = 1800000;
 
 const int HYSTERESIS = 20;
 
@@ -113,6 +113,9 @@ public:
     if (moisture >= (this->threshold + HYSTERESIS))
     {
       Serial.println(F("*** Pumpvorgang START ***"));
+      /* Randnotiz: Der Delay stoert die Funktionalitaet der Threadcontroller Bibliothek
+         (Die anderen Threads werden nicht ausgefuehrt)
+         Der Button und der Schalter sind aber waehrend dem Pumpvorgang irrelevant. */
 
       digitalWrite(PIN_PUMP, LOW);
       delay(this->pumpTime);
