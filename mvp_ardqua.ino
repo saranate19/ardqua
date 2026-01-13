@@ -30,11 +30,15 @@ enum DisplayMode
 };
 
 // ================= PROFILE =================
+// Maximaler und minimaler "messbarer" Wert (Wasser, Luft)
+const int MAX_VALUE = 550;
+const int MIN_VALUE = 210;
+
 // threshold of soil moisture measurement
 static constexpr int thr[3] = {
-    400, // feuchter Grenzwert
-    450, // Mittlerer Grenzwert
-    500  // Trockener Grenzwert
+    5.5, // feuchter Grenzwert
+    7, // Mittlerer Grenzwert
+    8.5  // Trockener Grenzwert
 };
 
 // pump run time in ms
@@ -50,9 +54,7 @@ static String str[3] = {
     "Trocken"  // Pumpdauer trockener Modus
 };
 
-const unsigned long SAMPLE_INTERVAL_MS = 1800000;
-
-const int HYSTERESIS = 20;
+const unsigned long SAMPLE_INTERVAL_MS = 10000;
 
 // ================= FEUCHTEVERLAUF =================
 const int HISTORY_SIZE = 64;
@@ -63,6 +65,14 @@ bool historyFilled = false;
 // ================= STATUS =================
 unsigned long lastSampleTs = 0;
 const int N_SAMPLES = 10;
+
+// Float Map Funktion fuer Feuchteskala
+float fmap(float x, float in_min, float in_max,
+           float out_min, float out_max) 
+{
+  return (x - in_min) * (out_max - out_min)
+         / (in_max - in_min) + out_min;
+}
 
 // =================================================
 // ================= KLASSEN =======================
@@ -110,7 +120,7 @@ public:
 
   void checkPump(int moisture)
   {
-    if (moisture >= (this->threshold + HYSTERESIS))
+    if (moisture >= (this->threshold))
     {
       Serial.println(F("*** Pumpvorgang START ***"));
       /* Randnotiz: Der Delay stoert die Funktionalitaet der Threadcontroller Bibliothek
@@ -189,13 +199,14 @@ public:
   int readSoilAveraged()
   {
     long sum = 0;
-    int moisture;
+    float moisture;
     for (int i = 0; i < N_SAMPLES; i++)
     {
       sum += analogRead(PIN_SOIL);
       delay(5);
     }
     moisture = sum / N_SAMPLES;
+    moisture = fmap(moisture, MIN_VALUE, MAX_VALUE, 0, 10);
 
     Serial.print(F("Profil: "));
     Serial.print(this->modeStr);
