@@ -1,78 +1,71 @@
-# ArdQua – Automatisches Bewässerungssystem
 
-ArdQua ist ein kompaktes, batteriebetriebenes Bewässerungssystem für Zimmerpflanzen. Das Gerät misst die Feuchtigkeit im Pflanzensubstrat und aktiviert bei Trockenheit automatisch eine Pumpe, welche eine definierte Menge Wasser über einen Schlauch direkt ins Substrat fördert. Das gesamte System ist als eigenständiges Modul konzipiert: neben die Pflanze stellen, Batterie einsetzen, Wasser auffüllen.
+# ARDQUA – Automatisches Bewässerungssystem mit Arduino
+
+ARDQUA ist ein Arduino-basiertes, autonom arbeitendes Bewässerungssystem für Zimmerpflanzen.  
+Es misst die Bodenfeuchtigkeit und steuert eine Wasserpumpe automatisch.
+
+Das Projekt wurde im Rahmen des Moduls **Hardwarenahe Programmierung** im **CAS Computer Science 1 (ZHAW)** umgesetzt.
 
 ---
 
 ## Funktionen
-- Kontinuierliche Messung der Bodenfeuchtigkeit  
-- Automatische Bewässerung bei Unterschreiten eines Schwellwerts  
-- Definierte Wassermenge pro Pumpen-Zyklus  
-- Geschlossenes Gehäuse mit integriertem Tank  
-- Batteriebetrieb  
-- Geringer Pflegeaufwand für Benutzerinnen und Benutzer
+
+- Kapazitiver Bodenfeuchtigkeitssensor  
+- Drei Bewässerungsprofile: **trocken / mittel / feucht** (Auswahl über 3-stufigen Schalter)  
+- Automatische Ansteuerung einer Wasserpumpe über ein Relais  
+- Cooldown-Zeit zur Vermeidung von Fehlmessungen und Überbewässerung  
+- TFT-Display mit Anzeige von:
+  - aktuellem Bodenfeuchtigkeitswert  
+  - aktivem Bewässerungsprofil  
+  - grafischem Verlauf der Bodenfeuchtigkeit  
+- Wechsel zwischen Text- und Graph-Anzeige per Tastendruck  
 
 ---
 
-## Projektziel
-Ein lauffähiges MVP (Minimum Viable Product), das:
-- zuverlässige Feuchtigkeitsmessungen ermöglicht,
-- die Pumpe präzise steuert,
-- Energieeffizienz berücksichtigt,
-- ein funktionales Gesamtsystem demonstriert.
+## Hardware 
+
+- Arduino Nano  
+- Kapazitiver Bodenfeuchtigkeitssensor  
+- TFT-Display (SPI)  
+- Relais und Wasserpumpe  
+- DPDT-Schalter (3-stufig)  
+- Druckknopf  
+- Externes Wasserreservoir  
+
+Die vollständige Pin-Belegung ist in der Projektdokumentation beschrieben.
 
 ---
 
-## Hardware
-- Mikrocontroller (Arduino-basiert)
-- Bodenfeuchtigkeitssensor
-- Mini-Wasserpumpe
-- MOSFET/Transistor zur Pumpensteuerung
-- Schläuche
-- Batterieeinheit
-- Gehäuse mit Wasserbehälter
+## Software
+
+- Arduino-Sketch mit eigener Klasse `Ardqua`  
+- Verwendete Libraries:
+  - `Adafruit_ST7735`
+  - `Adafruit_GFX`
+  - `ThreadController`
+  - `Thread`
+  - `SPI`
+  
 
 ---
 
-## Software / Logik
-- Sensorabfrage in Intervallen  
-- Glättung der Messwerte  
-- Schwellwert-Logik mit Zeitfenster  
-- Aktivierung der Pumpe über MOSFET  
-- Sicherheitsmechanismen:
-  - maximale Pumpdauer  
-  - Mindestabstand zwischen Bewässerungen  
+## Kalibrierung
+
+Der Bodenfeuchtigkeitssensor wird über zwei Referenzmessungen kalibriert:
+- Messung in Luft (trocken)
+- Messung in Wasser (nass)
+
+Die Bewässerungsgrenzwerte sowie die Pumpdauer sind statisch definiert und profilabhängig.
 
 ---
 
-## MVP-Fokus
-- Stabile Sensorwerte  
-- Wiederholbare Bewässerung  
-- Robuste Elektronik  
-- Energieverbrauch optimieren  
-- Einfache Nutzung ohne App oder Netzwerk
+## Projektstatus
+
+- MVP vollständig umgesetzt  
+- Bewässerungsprofile, Display-Modi und Automatisierung integriert  
+- Weitere Optimierungen (z. B. Energiesparmodus, Datenspeicherung) möglich
 
 ---
-
-## Gehäuse
-- Kompaktes Modul, das neben der Pflanze steht  
-- Integrierter Tank (z. B. PET- oder Kunststoffbehälter)  
-- Fach für Batterie  
-- Interne Kabelführung und Schlauchdurchführung  
-
----
-
-## Zukunftsideen
-- Zigbee-Integration für Home Assistant  
-- App-Anbindung  
-- Füllstandserkennung  
-- Mehrere Pflanzen anschliessbar  
-- 3D-gedrucktes Snap-Fit-Gehäuse  
-
-
----
-
 ## Lizenz
 Projektarbeit im Modul *Hardwarenahe Programmierung* (ZHAW).  
 Nutzung nach Absprache.
-
